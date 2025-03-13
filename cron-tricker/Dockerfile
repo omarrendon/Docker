@@ -1,17 +1,30 @@
-FROM --platform=$BUILDPLATFORM node:19.2-alpine
-
-RUN echo "I am running on $BUILDPLATFORM, building for $TARGETPLATFORM" > /log
-
+# Dependecias de desarrollo
+FROM node:19.2-alpine as deps
+# define el directorio de trabajo
 WORKDIR /app
-
-COPY . .
-
+# copia el archivo package.json al directorio raiz
+COPY package.json .
+# instala las dependenciass
 RUN npm install
 
+# Build y test
+FROM node:19.2-alpine as builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
 RUN npm run test
 
-RUN rm -rf test && rm -rf node_modules 
 
+# Dependencias de producción
+FROM node:19.2-alpine as prod-deps
+WORKDIR /app
+COPY package.json ./
 RUN npm install --prod
 
+# Ejecutar la app
+FROM node:19.2-alpine as runner
+WORKDIR /app
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY app.js  ./
+COPY tasks/  ./tasks          
 CMD [ "node", "app.js" ]
